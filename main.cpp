@@ -11,8 +11,6 @@ using namespace std;
 
 
 
-
-
 int main()
 {
 
@@ -30,7 +28,7 @@ int main()
     double surfOptPerc = 0.5;
 
     
-    Mat image = imread("fofonod80.png", IMREAD_GRAYSCALE);
+    Mat image = imread("imgs\\fofonod80.png", IMREAD_GRAYSCALE);
     Mat cropped = image(Rect(80,80, 220, 220)).clone();
 
     threshold(cropped, cropped, 170, 255, THRESH_BINARY);
@@ -45,17 +43,17 @@ int main()
     clock_t start, end;
 
     Microstructure ref(cropped);
-    ref.printToFileTecplot("referencia.dat");
+    ref.printToFileTecplot("outs\\referencia.dat");
 
 
     //two point -------------------------------------------------------------------------
     TwoPointGLP s2ref(ref, 2);
-    s2ref.writeToFile("s2ref.dat");
+    s2ref.writeToFile("outputs\\s2ref.dat");
 
 
     ////cluster function -------------------------------------------------------------------------
     ClusterGLP c2ref(ref, 2);
-    c2ref.writeToFile("c2ref.dat");
+    c2ref.writeToFile("outputs\\c2ref.dat");
 
    
     Microstructure michibrido(nx, ny, 1, ref.f); //a ser reconstruída
@@ -76,9 +74,9 @@ int main()
 
     double elapsedTimehibrido = double(end - start) / CLOCKS_PER_SEC;
 
-    michibrido.printToFileTecplot("reconstruidohibridos2c2.dat");
-    s2rechibrido.writeToFile("s2rechibrido.dat");
-    c2rechibrido.writeToFile("c2rechibrido.dat");
+    michibrido.printToFileTecplot("outputs\\reconstruidohibridos2c2.dat");
+    s2rechibrido.writeToFile("outputs\\s2rechibrido.dat");
+    c2rechibrido.writeToFile("outputs\\c2rechibrido.dat");
 
 
 
@@ -86,10 +84,10 @@ int main()
 
 
     TwoPointGLP s2final(michibrido, 2);
-    s2final.writeToFile("s2final.dat");
+    s2final.writeToFile("outputs\\s2final.dat");
 
     ClusterGLP c2final(michibrido, 2);
-    c2final.writeToFile("c2final.dat");
+    c2final.writeToFile("outputs\\c2final.dat");
 
 
 

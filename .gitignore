@@ -43,6 +43,7 @@ out
 # Visual Studio Project Files
 Release
 Debug
+.vs
 *.vcxproj*
 
 
