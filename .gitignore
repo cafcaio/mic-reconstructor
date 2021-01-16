@@ -38,6 +38,7 @@ out
 *.png
 *.jpg
 *.tif
+*.jfif
 
 # Visual Studio Project Files
 Release
