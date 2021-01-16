@@ -30,3 +30,21 @@
 *.exe
 *.out
 *.app
+
+# Data (corr functions, ref images)
+IMGS
+out
+*.dat
+*.png
+*.jpg
+*.tif
+
+# Visual Studio Project Files
+Release
+Debug
+*.vcxproj*
+
+
+
+
+
