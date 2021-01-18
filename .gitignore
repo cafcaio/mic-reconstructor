@@ -45,6 +45,8 @@ Release
 Debug
 .vs
 *.vcxproj*
+*.diagsession
+*.sln
 
 
 

@@ -13,11 +13,13 @@ public:
     vector<vector<int>> clusters, clustersAux;
     vector<vector<int>> pointsByCluster, pointsByClusterAux;
     vector<int> deletedClusterLabels, deletedClusterLabelsAux;
+    set<int> changedLabels;
 
     Microstructure& mic;
     int rmax, numAxis;
     double currEnergy, auxEnergy;
     bool isReference = false;
+    bool firstIteration = true;
 
 
     ClusterGLP(Microstructure& mic_, int numAxis_);
@@ -60,6 +62,8 @@ public:
     void update(int n0_, int n1_) override;
 
     double getCurrEnergy() override;
+
+    void restoreAux();
 
     void writeToFile(string path_);
 

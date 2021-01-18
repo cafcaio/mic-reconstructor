@@ -1,12 +1,14 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+#include <omp.h>
 #include <string>
 #include <vector>
 #include <random>
 #include <fstream>
 #include <set>
 #include <algorithm>
+#include <cmath>
 
 using namespace std;
 using namespace cv;
@@ -20,8 +22,11 @@ public:
     vector<int> xx, yy, zz;
 
     vector<double> lattice;
+    vector<int> sqrtTable;
+
 
     bool hasLattice = false;
+    bool hasSqrtTable = false;
 
     int np0 = 0;
     int np1 = 0;
@@ -42,6 +47,8 @@ public:
     //cria malha de sítios para cálculo do histograma de distâncias entre pares
     void allocateLattice();
 
+    //cria uma tabela de raízes quadradas
+    void allocateSqrtTable();
 
     //retorna índices 4-vizinhos OCUPADOS do ponto n
     vector<int> neighborsIndexes(int n);

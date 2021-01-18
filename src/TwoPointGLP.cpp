@@ -52,6 +52,7 @@ TwoPointGLP::TwoPointGLP(Microstructure& mic_, string targetPath, int numAxis_) 
 void TwoPointGLP::firstCalc() {
 
     pointCurr.assign(rmax, 0);
+    mic.allocateSqrtTable();
     mic.allocateLattice();
 
     int dist;
@@ -123,19 +124,50 @@ void TwoPointGLP::update(int n0_, int n1_) {
 
     pointAux = pointCurr;
 
-    int dist;
 
-    for (int i = 0; i < mic.n2; i++) {
-        dist = mic.dist(n1_, mic.phase1[i]);
-        if (dist != 0) pointAux[dist] = pointAux[dist] - 2;
+
+    //programa serial
+        //int dist;
+    //for (int i = 0; i < mic.n2; i++) {
+    //    dist = mic.dist(n1_, mic.phase1[i]);
+    //    if (dist != 0) pointAux[dist] -= 2;
+    //}
+    //for (int i = 0; i < mic.n2; i++) {
+    //    dist = mic.dist(n0_, mic.phase1[i]);
+    //    if (mic.phase1[i] != n1_)  pointAux[dist] += 2;
+    //}
+
+    //programa paralelo
+#pragma omp parallel
+    {
+        vector<int> p(rmax, 0);
+        int dist;
+
+
+#pragma omp for
+        for (int i = 0; i < mic.n2; i++) {
+            //cout << "i = " << i << " done by thread " << omp_get_thread_num() << endl;
+
+            dist = mic.dist(n1_, mic.phase1[i]);
+            if (dist != 0) p[dist] -= 2;
+        }
+
+#pragma omp for
+        for (int i = 0; i < mic.n2; i++) {
+
+            dist = mic.dist(n0_, mic.phase1[i]);
+            if (mic.phase1[i] != n1_)  p[dist] += 2;
+        }
+
+
+#pragma omp critical
+        {
+            for (int i = 0; i < rmax; i++) {
+                pointAux[i] += p[i];
+            }
+        }
+
     }
-
-
-    for (int i = 0; i < mic.n2; i++) {
-        dist = mic.dist(n0_, mic.phase1[i]);
-        if (mic.phase1[i] != n1_)  pointAux[dist] = pointAux[dist] + 2;
-    }
-
 
     auxEnergy = getAuxEnergy();
 

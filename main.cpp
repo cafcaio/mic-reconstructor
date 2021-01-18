@@ -13,37 +13,38 @@ using namespace std;
 
 int main()
 {
+    omp_set_num_threads(omp_get_max_threads());
 
-    int nx = 100;
-    int ny = 100;
+    int nx = 150;
+    int ny = 150;
     int nz = 1;
 
     double error = 1e-7;
-    int maxIterations = 1.5e06;
+    int maxIterations = 0.5e06;
 
-    int initialIterations = 3000;
-    int coolingIterations = 3000;
+    int initialIterations = 2000;
+    int coolingIterations = 2000;
     double coolingRate = 0.92;
-    double initialProb = 0.3;
-    double surfOptPerc = 0.5;
+    double initialProb = 0.4;
+    double surfOptPerc = 0.75;
 
     
-    Mat image = imread("imgs\\fofonod80.png", IMREAD_GRAYSCALE);
-    Mat cropped = image(Rect(80,80, 220, 220)).clone();
+    Mat image = imread("imgs\\tt1300.png", IMREAD_GRAYSCALE);
+    Mat cropped = image(Rect(0,0, 150, 150)).clone();
 
-    threshold(cropped, cropped, 170, 255, THRESH_BINARY);
+    threshold(cropped, cropped, 170, 255, THRESH_BINARY_INV);
 
     resize(cropped, cropped, Size(nx, ny), 0, 0, INTER_AREA);
 
-    //imshow("Original", image);
-    //imshow("Cortada", cropped);
-    //waitKey();
+    imshow("Original", image);
+    imshow("Cortada", cropped);
+    waitKey();
 
 
     clock_t start, end;
 
     Microstructure ref(cropped);
-    ref.printToFileTecplot("outs\\referencia.dat");
+    ref.printToFileTecplot("outputs\\referencia.dat");
 
 
     //two point -------------------------------------------------------------------------
@@ -64,7 +65,7 @@ int main()
     //inserir referências neste vector, usando operator&
     vector<CorrFunction*> funcs = { &s2rechibrido, &c2rechibrido };
 
-    Reconstructor rechibrido(michibrido, funcs, { 1,1 }, error, maxIterations);
+    Reconstructor rechibrido(michibrido, funcs, { 1, 1 }, error, maxIterations);
     rechibrido.setCoolingSchedule(initialIterations, coolingIterations, coolingRate, initialProb);
     rechibrido.setSurfaceOptStart(surfOptPerc);
 
@@ -89,8 +90,17 @@ int main()
     ClusterGLP c2final(michibrido, 2);
     c2final.writeToFile("outputs\\c2final.dat");
 
-
-
-
     return 0;
 }
+
+//double sqrDiff(double a, double b) {
+//	double ans = 
+//}
+//
+//int main(){
+//
+//
+//
+//
+//	return 0;
+//}

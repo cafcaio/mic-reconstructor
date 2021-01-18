@@ -52,7 +52,9 @@ ClusterGLP::ClusterGLP(Microstructure& mic_, string targetPath, int numAxis_) : 
 
 void ClusterGLP::firstCalc() {
 
+    mic.allocateSqrtTable();
     mic.allocateLattice();
+
 
     labels.assign(mic.n, 0);
     pointCurr.assign(rmax, 0);
@@ -144,6 +146,7 @@ void ClusterGLP::swap() {
     deletedClusterLabels = deletedClusterLabelsAux;
     pointsByCluster = pointsByClusterAux;
 
+
 }
 
 
@@ -182,8 +185,10 @@ int ClusterGLP::getNextLabel() {
     else {
         label = deletedClusterLabelsAux.back();
         deletedClusterLabelsAux.pop_back();
+
     }
 
+    changedLabels.insert(label);
     return label;
 }
 
@@ -231,6 +236,7 @@ void ClusterGLP::vacateClusterAux(int label) {
         clustersAux[label].clear();
         pointsByClusterAux[label].assign(rmax, 0);
         deletedClusterLabelsAux.push_back(label);
+        changedLabels.insert(label);
     }
 }
 
@@ -238,11 +244,15 @@ void ClusterGLP::update(int n0_, int n1_) {
     //n0_ é sempre 0 (pixel branco - índice do mic.arr)
     //n1_ é sempre 1 (pixel preto)
 
-    pointAux = pointCurr;
-    clustersAux = clusters;
-    labelsAux = labels;
-    deletedClusterLabelsAux = deletedClusterLabels;
-    pointsByClusterAux = pointsByCluster;
+
+    restoreAux();
+    changedLabels.clear();
+
+    //pointAux = pointCurr;
+    //labelsAux = labels;
+    //deletedClusterLabelsAux = deletedClusterLabels;
+    //pointsByClusterAux = pointsByCluster;
+    //clustersAux = clusters;
 
     //início tratamento n0_ (pixel branco que vai virar preto)
     mic.arr[n0_] = 1;
@@ -256,8 +266,8 @@ void ClusterGLP::update(int n0_, int n1_) {
         newLabel = getNextLabel();
     }
     else {
-
         newLabel = *min_element(nl.begin(), nl.end());
+        changedLabels.insert(newLabel);
     }
 
     //cross-check pair from now interconnected clusters
@@ -269,9 +279,8 @@ void ClusterGLP::update(int n0_, int n1_) {
             int dist, a, b;
 
             for (int j = 0; j < clustersAux[la].size(); j++) {
-                a = clustersAux[la][j];
-
                 for (int k = 0; k < clustersAux[lb].size(); k++) {
+                    a = clustersAux[la][j];
                     b = clustersAux[lb][k];
                     dist = mic.dist(a, b);
                     pointAux[dist] += 2;
@@ -303,7 +312,7 @@ void ClusterGLP::update(int n0_, int n1_) {
     }
 
     //add pairs with new black pixel
-
+    //parallelize
     for (int i = 0; i < clustersAux[newLabel].size(); i++) { //note que nunca ocorre mic.dist(n0_, n0_)
         int b = clustersAux[newLabel][i];
         int dist = mic.dist(n0_, b);
@@ -329,6 +338,7 @@ void ClusterGLP::update(int n0_, int n1_) {
     mic.arr[n1_] = 0; //muito importante para visitAux não revisitar n1_
 
     int lab = labelsAux[n1_]; //lab é a label que contém n1_ e todos os pontos do cluster em que n1_ estava
+
 
     vector<int> neighbors = mic.neighborsIndexes(n1_);
 
@@ -411,6 +421,44 @@ void ClusterGLP::update(int n0_, int n1_) {
 
 double ClusterGLP::getCurrEnergy() {
     return currEnergy;
+}
+
+void ClusterGLP::restoreAux() {
+
+    if (firstIteration) {
+
+        pointAux = pointCurr;
+        labelsAux = labels;
+        deletedClusterLabelsAux = deletedClusterLabels;
+        pointsByClusterAux = pointsByCluster;
+        clustersAux = clusters;
+
+        firstIteration = false;
+    }
+    else {
+
+        pointAux = pointCurr;
+        labelsAux = labels;
+        deletedClusterLabelsAux = deletedClusterLabels;
+
+        /*cout << "clustersAux/clusters size " << clustersAux.size() << "  " << clusters.size() << endl;
+        cout << "PBclustersAux/PBclusters size " << pointsByClusterAux.size() << "  " << pointsByCluster.size() << endl;*/
+
+        int s = clusters.size();
+        clustersAux.resize(s);
+        pointsByClusterAux.resize(s);
+
+
+        for (auto f : changedLabels) {
+            if (f < s) {
+                clustersAux[f] = clusters[f];
+                pointsByClusterAux[f] = pointsByCluster[f];
+            }
+        }
+    }
+
+
+
 }
 
 void ClusterGLP::writeToFile(string path_) {

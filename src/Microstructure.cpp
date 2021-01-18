@@ -118,25 +118,69 @@ int Microstructure::max_diagonal_distance() {
     return sqrt((nx - 1) * (nx - 1) + (ny - 1) * (ny - 1) + (nz - 1) * (nz - 1)) + 1;
 }
 
+
+
 //cria malha de sítios para cálculo do histograma de distâncias entre pares
+void Microstructure::allocateSqrtTable() {
+
+    if (hasSqrtTable == false) {
+        int a = max_diagonal_distance() * max_diagonal_distance();
+        sqrtTable.assign(a, 0);
+
+        for (int i = 0; i < a; i++) {
+            sqrtTable[i] = sqrt(i);
+        }
+
+    }
+
+    hasSqrtTable = true;
+}
+
 void Microstructure::allocateLattice() {
 
     if (hasLattice == false) {
         lattice.assign(max_diagonal_distance(), 0);
 
-        int distance;
+        // versão serial
+        //int d;
+        //for (int i = 0; i < n; i++) {
+        //    for (int j = 0; j < i; j++) {
+        //        d = dist(i, j);
+        //        lattice[d] += 2;
+        //    }
+        //}
+        //lattice[0] += n;
 
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < i; j++) {
-                distance = dist(i, j);
-                lattice[distance] += 2;
+
+
+
+#pragma omp parallel
+        {
+            vector<int> p(max_diagonal_distance(), 0);
+            int distance;
+
+#pragma omp for schedule(guided)
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < i; j++) {
+                    distance = dist(i, j);
+                    p[distance] += 2;
+                }
+            }
+
+#pragma omp critical
+            {
+                for (int j = 0; j < max_diagonal_distance(); j++) {
+                    lattice[j] += p[j];
+                }
             }
         }
 
         lattice[0] += n;
+
     }
 
     hasLattice = true;
+
 
 
 }
@@ -253,11 +297,19 @@ int Microstructure::axisSize(int axis_) {
 }
 
 int Microstructure::dist(int i0, int i1) {
-    int ans = (xx[i0] - xx[i1]) * (xx[i0] - xx[i1]);
-    ans += (yy[i0] - yy[i1]) * (yy[i0] - yy[i1]);
-    ans += (zz[i0] - zz[i1]) * (zz[i0] - zz[i1]);
 
-    return sqrt(ans);
+    int x = xx[i0] - xx[i1];
+    int y = yy[i0] - yy[i1];
+    int z = zz[i0] - zz[i1];
+
+    int a = x * x + y * y + z * z;
+
+    if (hasSqrtTable) {
+        return sqrtTable[a];
+    }
+    else {
+        return sqrt(a);
+    }
 
 }
 

@@ -57,6 +57,8 @@ void Reconstructor::reconstruct() {
     mt19937 gen(rd());
     uniform_real_distribution<double> dist(0.0, 1.0);
 
+    double timeElapsed = clock();
+
     int i0, i1, n0, n1;
     int trocasPos = 0;
     int trocasZero = 0;
@@ -85,7 +87,7 @@ void Reconstructor::reconstruct() {
             i1 = mic.n2 * dist(gen); //seleciona pixel preto
             n1 = mic.phase1[i1];
 
-            while (mic.freeEnergy(n1) == 0) { //força pixel superficial preto
+            while (mic.freeEnergy8(n1) == 0) { //força pixel superficial preto
                 i1 = mic.n2 * dist(gen);
                 n1 = mic.phase1[i1];
             }
@@ -131,7 +133,8 @@ void Reconstructor::reconstruct() {
             cout << "Energia total = " << totalEnergy() << "\n";
             cout << "Num de trocas desfavoraveis = " << trocasPos << "\n";
             cout << "Num de trocas favoraveis = " << trocasZero << " (dif: " << trocasZero - trocasPos << ")" << "\n";
-            cout << "Temperatura = " << temp << "\n\n";
+            cout << "Temperatura = " << temp << "\n";
+            cout << "Tempo decorrido = " << (clock() - timeElapsed) / CLOCKS_PER_SEC << " s\n\n";
         }
 
 
@@ -144,13 +147,17 @@ void Reconstructor::reconstruct() {
     cout << "Energia total = " << totalEnergy() << "\n";
     cout << "Num de trocas desfavoraveis = " << trocasPos << "\n";
     cout << "Num de trocas favoraveis = " << trocasZero << "\n";
-    cout << "Temperatura = " << temp << "\n\n";
+    cout << "Temperatura = " << temp << "\n";
+    cout << "Tempo total = " << (clock() - timeElapsed) / CLOCKS_PER_SEC << " s\n\n";
     if (t == tmax) {
         cout << "Encerrado pelo critério de tempo máximo" << "\n";
     }
     else {
         cout << "Encerrado pelo critério de tolerância de energia" << "\n";
     }
+
+
+
 }
 
 void Reconstructor::setCoolingSchedule(int initial_, int chainSize_, double factor_, double prob_) {
