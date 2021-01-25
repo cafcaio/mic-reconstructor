@@ -3,6 +3,7 @@
 using namespace std;
 using namespace cv;
 
+
 Microstructure::Microstructure(Mat& image) { //lê da imagem diretamente
 
     nx = image.cols;
@@ -123,7 +124,7 @@ int Microstructure::max_diagonal_distance() {
 //cria malha de sítios para cálculo do histograma de distâncias entre pares
 void Microstructure::allocateSqrtTable() {
 
-    if (hasSqrtTable == false) {
+    if (allocatedSqrtTable == false) {
         int a = max_diagonal_distance() * max_diagonal_distance();
         sqrtTable.assign(a, 0);
 
@@ -133,25 +134,13 @@ void Microstructure::allocateSqrtTable() {
 
     }
 
-    hasSqrtTable = true;
+    allocatedSqrtTable = true;
 }
 
 void Microstructure::allocateLattice() {
 
-    if (hasLattice == false) {
+    if (allocatedLattice == false) {
         lattice.assign(max_diagonal_distance(), 0);
-
-        // versão serial
-        //int d;
-        //for (int i = 0; i < n; i++) {
-        //    for (int j = 0; j < i; j++) {
-        //        d = dist(i, j);
-        //        lattice[d] += 2;
-        //    }
-        //}
-        //lattice[0] += n;
-
-
 
 
 #pragma omp parallel
@@ -179,7 +168,7 @@ void Microstructure::allocateLattice() {
 
     }
 
-    hasLattice = true;
+    allocatedLattice = true;
 
 
 
@@ -188,21 +177,33 @@ void Microstructure::allocateLattice() {
 //retorna índices dos 4-vizinhos OCUPADOS do ponto n
 vector<int> Microstructure::neighborsIndexes(int n) {
     vector<int> ans = {};
-    int x[] = { -1, 1, 0, 0, 0, 0 };
-    int y[] = { 0, 0, -1, 1, 0, 0 };
-    int z[] = { 0, 0, 0, 0, -1, 1 };
+    ans.reserve(6);
 
     int ind;
-    for (int i = 0; i < 6; i++) {
-        ind = index(xx[n] + x[i], yy[n] + y[i], zz[n] + z[i]);
-        if (ind != -1 && arr[ind] == 1) { //verifica se não excede a malha e se está ocupado
-            ans.push_back(ind);
-        }
-    }
+
+    ind = index(xx[n] + 1, yy[n], zz[n]);
+    if (ind != -1 && arr[ind] == 1) ans.push_back(ind);
+
+    ind = index(xx[n] - 1, yy[n], zz[n]);
+    if (ind != -1 && arr[ind] == 1) ans.push_back(ind);
+
+    ind = index(xx[n], yy[n] + 1, zz[n]);
+    if (ind != -1 && arr[ind] == 1) ans.push_back(ind);
+
+    ind = index(xx[n], yy[n] - 1, zz[n]);
+    if (ind != -1 && arr[ind] == 1) ans.push_back(ind);
+
+    ind = index(xx[n], yy[n], zz[n] + 1);
+    if (ind != -1 && arr[ind] == 1) ans.push_back(ind);
+
+    ind = index(xx[n], yy[n], zz[n] - 1);
+    if (ind != -1 && arr[ind] == 1) ans.push_back(ind);
 
 
     return ans;
 }
+
+
 
 //retorna índices dos 8-vizinhos OCUPADOS do ponto n
 vector<int> Microstructure::neighborsIndexes8(int n) {
@@ -224,21 +225,6 @@ vector<int> Microstructure::neighborsIndexes8(int n) {
 
 }
 
-bool Microstructure::hasConnectedContour(int p) {
-
-    set<int> a;
-    vector<int> neighbors = neighborsIndexes(p);
-
-    for (int i = 0; i < neighbors.size(); i++) {
-        vector<int> b = neighborsIndexes(neighbors[i]);
-        for (int j = 0; j < b.size(); j++) {
-            if (b[j] != p) {
-                if (a.insert(b[j]).second == false) return true;
-            }
-        }
-    }
-    return false;
-}
 
 //calcula número de pixels de fase diferente considerando uma 4-vizinhança ou 6-vizinhança (3D)
 int Microstructure::freeEnergy(int n) {
@@ -246,19 +232,30 @@ int Microstructure::freeEnergy(int n) {
     int sum = 0;
     int ref = 1;
 
-    int x[] = { -1, 1, 0, 0, 0, 0 };
-    int y[] = { 0, 0, -1, 1, 0, 0 };
-    int z[] = { 0, 0, 0, 0, -1, 1 };
-
     int ind;
-    for (int i = 0; i < 6; i++) {
-        ind = index(xx[n] + x[i], yy[n] + y[i], zz[n] + z[i]);
-        if (ind != -1 && arr[ind] != ref) { //verifica se não excede a malha e se está ocupado
-            sum++;
-        }
-    }
+
+    ind = index(xx[n] + 1, yy[n], zz[n]);
+    if (ind != -1 && arr[ind] != ref) sum++;
+
+    ind = index(xx[n] - 1, yy[n], zz[n]);
+    if (ind != -1 && arr[ind] != ref) sum++;
+
+    ind = index(xx[n], yy[n] + 1, zz[n]);
+    if (ind != -1 && arr[ind] != ref) sum++;
+
+    ind = index(xx[n], yy[n] - 1, zz[n]);
+    if (ind != -1 && arr[ind] != ref) sum++;
+
+    ind = index(xx[n], yy[n], zz[n] + 1);
+    if (ind != -1 && arr[ind] != ref) sum++;
+
+    ind = index(xx[n], yy[n], zz[n] - 1);
+    if (ind != -1 && arr[ind] != ref) sum++;
+
 
     return sum;
+
+ 
 
 }
 
@@ -304,7 +301,7 @@ int Microstructure::dist(int i0, int i1) {
 
     int a = x * x + y * y + z * z;
 
-    if (hasSqrtTable) {
+    if (allocatedSqrtTable) {
         return sqrtTable[a];
     }
     else {
@@ -339,6 +336,29 @@ void Microstructure::printToFileTecplot(string path) {
 
     for (int i = 0; i < n; i++) {
         file << xx[i] << "\t" << yy[i] << "\t" << zz[i] << "\t" << arr[i] << "\n";
+    }
+
+    file.close();
+}
+
+void Microstructure::printToFileParaview(string path) {
+    ofstream file;
+    file.open(path);
+
+    //Escreve o cabeçalho para o ParaView
+    file << "# vtk DataFile Version 2.0\n"
+        << "Microestrutura\n"
+        << "ASCII\n"
+        << "DATASET STRUCTURED_POINTS\n"
+        << "DIMENSIONS " << nx << " " << ny << " " << nz << "\n"
+        << "ORIGIN 0 0 0\n"
+        << "SPACING 1 1 1\n\n"
+        << "POINT_DATA " << n << "\n"
+        << "SCALARS PHASE float\n"
+        << "LOOKUP_TABLE default\n";
+
+    for (int i = 0; i < n; i++) {
+        file << arr[i] << "\n";
     }
 
     file.close();

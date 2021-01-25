@@ -16,17 +16,24 @@ using namespace cv;
 class Microstructure {
 
 public:
-    int nx, ny, nz, n, n1, n2;
-    double f = 0;
-    vector<int> arr, phase0, phase1;
-    vector<int> xx, yy, zz;
+    
+    int nx, ny, nz; //microstructure dimensions
+    int n; //total number of pixels
+    int n1; //number of white pixels
+    int n2;  //number of black pixels
+    double f = 0; //volume fraction of black pixels
+    vector<int> arr; //array of phases
+    vector<int> phase0; //indices of all white pixels
+    vector<int> phase1; //indexes of all black pixels
+    vector<int> xx, yy, zz; //coordinates of all n pixels
 
-    vector<double> lattice;
-    vector<int> sqrtTable;
+    vector<double> lattice; //lattice sites separation histogram
+    vector<int> sqrtTable; //cached square root table (for distance computation)
+    bool allocatedLattice = false;
+    bool allocatedSqrtTable = false;
 
-
-    bool hasLattice = false;
-    bool hasSqrtTable = false;
+    //vagant points coords and indexes
+    //removal intended
 
     int np0 = 0;
     int np1 = 0;
@@ -38,65 +45,84 @@ public:
     int zp1 = 0;
 
 
+    //Constructors ------------------------------------------------------------------------------
+    
+    //Create matrix based on OpenCV mat object (reference microstructure)
     Microstructure(Mat& image);
+
+    //Creates a random matrix with specified dimensions and volume fraction
     Microstructure(int nx_, int ny_, int nz_, double f_);
 
-    //distância diagonal máxima na microestrutura
-    int max_diagonal_distance();
 
-    //cria malha de sítios para cálculo do histograma de distâncias entre pares
-    void allocateLattice();
 
-    //cria uma tabela de raízes quadradas
-    void allocateSqrtTable();
 
-    //retorna índices 4-vizinhos OCUPADOS do ponto n
+
+    //Main methods ------------------------------------------------------------------------------
+
+    //Returns indices of all OCCUPIED 4-neighbors around pixel n
     vector<int> neighborsIndexes(int n);
 
-    //retorna índices vizinhos OCUPADOS do ponto n
+    //Returns indices of all OCCUPIED 8-neighbors around pixel n
     vector<int> neighborsIndexes8(int n);
 
-    //retorna true se houver pelo menos dois pixels vizinhos entre si EM TORNO do ponto i
-    bool hasConnectedContour(int p);
-
-    //calcula número de pixels de fase diferente considerando uma 4-vizinhança ou 6-vizinhança (3D)
+    //Returns number of UNOCCUPIED 4-neighbors around pixel n (8-neighbors in 3D)
     int freeEnergy(int n);
 
-    //calcula número de pixels de outra fase considerando uma 8-vizinhança
+    //Returns number of UNOCCUPIED 8-neighbors around pixel n (26-neighbors in 3D)
     int freeEnergy8(int n);
 
-    int axisSize(int axis_);
-
+    //Returns distance between pixels i0 and i1
     int dist(int i0, int i1);
 
+    //Swaps pixels ind0 and ind1, where ind0 is an index of vector phase0 and ind1 is an index of vector phase1
     void swap(int ind0, int ind1);
 
-    void printToFileTecplot(string path);
 
-    //métodos que gerenciam pontos vagantes p0 e p1 para fins de CorrFunction
-    void setPoint0(int n0_);
 
-    void setPoint1(int n1_);
 
-    void advancePoint0(int axis);
+    //Utils ---------------------------------------------------------------------------------------
 
-    void backPoint0(int axis);
+    //Calculates maximum distance of a pixel pair in the matrix
+    int max_diagonal_distance();
 
-    void advancePoint1(int axis);
+    //Allocates lattice site pair distance histogram
+    void allocateLattice();
 
-    void backPoint1(int axis);
+    //Allocates square root table for fast distance calculations
+    void allocateSqrtTable();
 
-    int phasePoint0();
-
-    int phasePoint1();
-
-    //retorna índice vetorizado do ponto (x,y,z)
-    //retorna -1 se o índice exceder os limites da matriz
+    //returns vectorized index of point (x,y,z)
+    //returns -1 if point exceeds matrix limits
     int index(int x, int y, int z);
 
+    //Returns axis axis_ size (axis are 0-indexed starting with x-axis)
+    int axisSize(int axis_);
 
+
+
+
+    //Outputs --------------------------------
+
+    //Write Tecplot-formatted microstructure current phase state in path directory  (.dat file recommended)
+    void printToFileTecplot(string path);
+
+    //Write Paraview-formatted microstructure current phase state in path directory  (.dat file recommended)
+    void printToFileParaview(string path);
+
+
+
+    //Points accessors and mutators ----------------------------
+    //removal intended
+
+    void setPoint0(int n0_);
+    void setPoint1(int n1_);
+    void advancePoint0(int axis);
+    void backPoint0(int axis);
+    void advancePoint1(int axis);
+    void backPoint1(int axis);
+    int phasePoint0();
+    int phasePoint1();
     int coordPoint0(int axis);
-
     int coordPoint1(int axis);
 
 };

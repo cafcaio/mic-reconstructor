@@ -55,17 +55,33 @@ void TwoPointGLP::firstCalc() {
     mic.allocateSqrtTable();
     mic.allocateLattice();
 
-    int dist;
 
+    //parallelize
+#pragma omp parallel
+    {
+        vector<int> p(rmax, 0);
+        int dist;
 
-    for (int i = 0; i < mic.n2; i++) {
-        //primeiro ponto
-        for (int j = 0; j < mic.n2; j++) {
-            //todos os outros segundos pontos
-            dist = mic.dist(mic.phase1[i], mic.phase1[j]); //phase1 = só pontos pretos
-            pointCurr[dist]++;
+#pragma omp for schedule(dynamic)
+        for (int i = 0; i < mic.n2; i++) {
+            for (int j = 0; j < i; j++) {
+                //todos os outros segundos pontos
+                dist = mic.dist(mic.phase1[i], mic.phase1[j]); //phase1 = só pontos pretos
+                p[dist] += 2;
+            }
         }
+
+#pragma omp critical
+        {
+            for (int i = 0; i < rmax; i++) {
+                pointCurr[i] += p[i];
+            }
+
+        }
+
     }
+
+    pointCurr[0] += mic.n2;
 }
 
 
@@ -150,15 +166,11 @@ void TwoPointGLP::update(int n0_, int n1_) {
 
             dist = mic.dist(n1_, mic.phase1[i]);
             if (dist != 0) p[dist] -= 2;
-        }
-
-#pragma omp for
-        for (int i = 0; i < mic.n2; i++) {
 
             dist = mic.dist(n0_, mic.phase1[i]);
             if (mic.phase1[i] != n1_)  p[dist] += 2;
-        }
 
+        }
 
 #pragma omp critical
         {

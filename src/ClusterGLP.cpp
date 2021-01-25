@@ -336,77 +336,104 @@ void ClusterGLP::update(int n0_, int n1_) {
     // ---------------- inicio tratamento pixel preto que virará branco ----------------------
 
     mic.arr[n1_] = 0; //muito importante para visitAux não revisitar n1_
-
     int lab = labelsAux[n1_]; //lab é a label que contém n1_ e todos os pontos do cluster em que n1_ estava
 
+    if (mic.freeEnergy8(n1_)==0) {
+        //pixel inside cluster
 
-    vector<int> neighbors = mic.neighborsIndexes(n1_);
-
-    //removing contribution of soon-to-be dismantled cluster of the general count
-    for (int i = 0; i < pointsByClusterAux[lab].size(); i++) {
-        pointAux[i] -= pointsByClusterAux[lab][i];
-    }
-
-    //making points of soon-to-be dismantled cluster label-less
-    for (int i = 0; i < clustersAux[lab].size(); i++) {
-        int a = clustersAux[lab][i];
-        labelsAux[a] = 0;
-    }
-
-    vector<int> saved = pointsByClusterAux[lab];
-
-    //remove cluster
-    vacateClusterAux(lab);
+        changedLabels.insert(lab);
 
 
-    vector<int> clusterLabelsToRecompute = {};
+        //delete n1_ from clustersAux[lab] with back-swap trick
+        auto it = find(clustersAux[lab].begin(), clustersAux[lab].end(), n1_);
+        *it = move(clustersAux[lab].back());
+        clustersAux[lab].pop_back();
 
-    //visit neighbors again using DFS (possibly increasing the number of connected components)
-    for (int i = 0; i < neighbors.size(); i++) {
-        int b = neighbors[i];
-        if (labelsAux[b] == 0) {
-            int l = getNextLabel();
-            clusterLabelsToRecompute.push_back(l);
-            visitAux(b, l);
-        }
-    }
-
-    if (clusterLabelsToRecompute.size() == 1) {
-
-        for (int i = 0; i < pointsByClusterAux[lab].size(); i++) {
-            pointsByClusterAux[lab][i] = saved[i];
-            pointAux[i] += pointsByClusterAux[lab][i];
-        }
 
         for (int i = 0; i < clustersAux[lab].size(); i++) { //note que nunca ocorre mic.dist(n1_, n1_)
             int b = clustersAux[lab][i];
             int dist = mic.dist(n1_, b);
             pointAux[dist] -= 2;
             pointsByClusterAux[lab][dist] -= 2;
-
         }
 
-        pointsByClusterAux[lab][0]--;
+        labelsAux[n1_] = 0;
         pointAux[0]--;
+        pointsByClusterAux[lab][0]--;
+
 
     }
     else {
 
-        for (int ii = 0; ii < clusterLabelsToRecompute.size(); ii++) {
-            int l = clusterLabelsToRecompute[ii];
 
-            for (int i = 0; i < clustersAux[l].size(); i++) {
-                int a = clustersAux[l][i];
-                for (int j = 0; j < i; j++) {
-                    int b = clustersAux[l][j];
-                    int dist = mic.dist(a, b);
-                    pointAux[dist] += 2;
-                    pointsByClusterAux[l][dist] += 2;
-                }
+        vector<int> neighbors = mic.neighborsIndexes(n1_);
+
+        //removing contribution of soon-to-be dismantled cluster of the general count
+        for (int i = 0; i < pointsByClusterAux[lab].size(); i++) {
+            pointAux[i] -= pointsByClusterAux[lab][i];
+        }
+
+        //making points of soon-to-be dismantled cluster label-less
+        for (int i = 0; i < clustersAux[lab].size(); i++) {
+            int a = clustersAux[lab][i];
+            labelsAux[a] = 0;
+        }
+
+        vector<int> saved = pointsByClusterAux[lab];
+
+        //remove cluster
+        vacateClusterAux(lab);
+
+
+        vector<int> clusterLabelsToRecompute = {};
+
+        //visit neighbors again using DFS (possibly increasing the number of connected components)
+        for (int i = 0; i < neighbors.size(); i++) {
+            int b = neighbors[i];
+            if (labelsAux[b] == 0) {
+                int l = getNextLabel();
+                clusterLabelsToRecompute.push_back(l);
+                visitAux(b, l);
             }
-            pointAux[0] += clustersAux[l].size();
-            pointsByClusterAux[l][0] += clustersAux[l].size();
+        }
 
+        if (clusterLabelsToRecompute.size() == 1) {
+
+            for (int i = 0; i < pointsByClusterAux[lab].size(); i++) {
+                pointsByClusterAux[lab][i] = saved[i];
+                pointAux[i] += pointsByClusterAux[lab][i];
+            }
+
+            for (int i = 0; i < clustersAux[lab].size(); i++) { //note que nunca ocorre mic.dist(n1_, n1_)
+                int b = clustersAux[lab][i];
+                int dist = mic.dist(n1_, b);
+                pointAux[dist] -= 2;
+                pointsByClusterAux[lab][dist] -= 2;
+
+            }
+
+            pointsByClusterAux[lab][0]--;
+            pointAux[0]--;
+
+        }
+        else {
+
+            for (int ii = 0; ii < clusterLabelsToRecompute.size(); ii++) {
+                int l = clusterLabelsToRecompute[ii];
+
+                for (int i = 0; i < clustersAux[l].size(); i++) {
+                    int a = clustersAux[l][i];
+                    for (int j = 0; j < i; j++) {
+                        int b = clustersAux[l][j];
+                        int dist = mic.dist(a, b);
+                        pointAux[dist] += 2;
+                        pointsByClusterAux[l][dist] += 2;
+                    }
+                }
+                pointAux[0] += clustersAux[l].size();
+                pointsByClusterAux[l][0] += clustersAux[l].size();
+
+            }
         }
     }
 
@@ -456,8 +483,6 @@ void ClusterGLP::restoreAux() {
             }
         }
     }
-
-
 
 }
 

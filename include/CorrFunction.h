@@ -1,6 +1,6 @@
 #pragma once
 
-//Classe que gerencia microestruturas
+//Classe (interface) que gerencia microestruturas
 //incluindo referências e reconstruções
 
 class CorrFunction {
