@@ -1,17 +1,9 @@
 #include "ClusterGLP.h"
 
-//imprime vector<int> em linha
-void printVector(vector<int> vector) {
-    for (int i = 0; i < vector.size(); i++) {
-        cout << vector[i] << "\t";
-    }
-    cout << "\n";
-}
-
-ClusterGLP::ClusterGLP(Microstructure& mic_, int numAxis_) : mic(mic_) { //assume como referência
+ClusterGLP::ClusterGLP(Microstructure& mic_) : mic(mic_) { //assume como referência
     isReference = true;
+    firstIteration = true; //marks if it is first iteration (for vector copying purposes)
 
-    numAxis = numAxis_;
 
     rmax = mic.max_diagonal_distance();
 
@@ -28,26 +20,50 @@ ClusterGLP::ClusterGLP(Microstructure& mic_, int numAxis_) : mic(mic_) { //assum
 
 }
 
-ClusterGLP::ClusterGLP(Microstructure& mic_, vector<double> target_, int numAxis_) : mic(mic_) { //lê do vetor
-    numAxis = numAxis_;
+ClusterGLP::ClusterGLP(Microstructure& mic_, vector<double> target_) : mic(mic_) { //lê do vetor
+    isReference = false; //marks correlation function as reference (won't be updated and such)
+    firstIteration = true; //marks if it is first iteration (for vector copying purposes)
+
 
     rmax = mic.max_diagonal_distance();
+    //rmax = target_.size();
 
     firstCalc();
     target = target_;
+
+    fillTarget();
+
     currEnergy = getStartEnergy();
 
 }
 
-ClusterGLP::ClusterGLP(Microstructure& mic_, string targetPath, int numAxis_) : mic(mic_) {
-    numAxis = numAxis_;
+ClusterGLP::ClusterGLP(Microstructure& mic_, string targetPath) : mic(mic_) {
+    isReference = false; //marks correlation function as reference (won't be updated and such)
+    firstIteration = true; //marks if it is first iteration (for vector copying purposes)
+
+
 
     rmax = mic.max_diagonal_distance();
 
     firstCalc();
     readFile(targetPath);
+
+    fillTarget();
+
     currEnergy = getStartEnergy();
 
+}
+
+void ClusterGLP::fillTarget() {
+    if (target.size() < mic.max_diagonal_distance()) {
+        cout << "A função de correlação de cluster é pequena demais para este tamanho de microestrutura." << endl;
+        cout << "Tamanho ideal para 2D: " << int(target.size() / sqrt(2)) << endl;
+        cout << "Tamanho ideal para 3D: " << int(target.size() / sqrt(3)) << endl;
+    }
+
+    while (target.size() < mic.max_diagonal_distance()) {
+        target.push_back(0);
+    }
 }
 
 void ClusterGLP::firstCalc() {
@@ -60,10 +76,11 @@ void ClusterGLP::firstCalc() {
     pointCurr.assign(rmax, 0);
 
     clusters.reserve(mic.n2);
-    clusters.push_back({}); //0-index means unlabeled black pixel
+    clusters.push_back(vector<int>()); //0-index means unlabeled black pixel
 
     pointsByCluster.reserve(mic.n2);
-    pointsByCluster.push_back({}); //0-index means unlabeled black pixel
+    pointsByCluster.push_back(vector<int>()); //0-index means unlabeled black pixel
+
 
 
     //cluster labelling using depth-first search
@@ -75,10 +92,10 @@ void ClusterGLP::firstCalc() {
         if (labels[ind] == 0) {
             nextClusterLabel++;
 
-            clusters.push_back({});
+            clusters.push_back(vector<int>());
             clusters[nextClusterLabel].reserve(mic.n2);
 
-            pointsByCluster.push_back({});
+            pointsByCluster.push_back(vector<int>());
             pointsByCluster[nextClusterLabel].assign(rmax, 0);
 
             visit(ind, nextClusterLabel);
@@ -109,13 +126,13 @@ void ClusterGLP::firstCalc() {
     }
 }
 
-
 double ClusterGLP::getStartEnergy() {
     double sum = 0;
     double val;
     for (int r = 0; r < rmax; r++) {
         val = (target[r] - pointCurr[r] / mic.lattice[r]);
         sum += val * val;
+        //cout << "val " << val << endl;
     }
     return sum;
 }
@@ -174,10 +191,10 @@ int ClusterGLP::getNextLabel() {
 
         label = clustersAux.size();
 
-        clustersAux.push_back({});
+        clustersAux.push_back(vector<int>());
         clustersAux[label].reserve(mic.n2);
 
-        pointsByClusterAux.push_back({});
+        pointsByClusterAux.push_back(vector<int>());
         pointsByClusterAux[label].assign(rmax, 0);
 
     }
@@ -185,6 +202,10 @@ int ClusterGLP::getNextLabel() {
     else {
         label = deletedClusterLabelsAux.back();
         deletedClusterLabelsAux.pop_back();
+
+        pointsByClusterAux[label].assign(rmax, 0);
+
+
 
     }
 
@@ -233,11 +254,21 @@ void ClusterGLP::visitAux(int n, int currentLabel) {
 
 void ClusterGLP::vacateClusterAux(int label) {
     if (!clustersAux[label].empty()) {
-        clustersAux[label].clear();
-        pointsByClusterAux[label].assign(rmax, 0);
+
+        //clustersAux[label].clear();
+        //pointsByClusterAux[label].assign(rmax, 0);
+
+        vector<int>().swap(clustersAux[label]);
+        vector<int>().swap(pointsByClusterAux[label]);
+
         deletedClusterLabelsAux.push_back(label);
+
         changedLabels.insert(label);
     }
+}
+
+void joinClustersAux(int label) {
+
 }
 
 void ClusterGLP::update(int n0_, int n1_) {
@@ -246,80 +277,135 @@ void ClusterGLP::update(int n0_, int n1_) {
 
 
     restoreAux();
-    changedLabels.clear();
-
-    //pointAux = pointCurr;
-    //labelsAux = labels;
-    //deletedClusterLabelsAux = deletedClusterLabels;
-    //pointsByClusterAux = pointsByCluster;
-    //clustersAux = clusters;
-
+    
     //início tratamento n0_ (pixel branco que vai virar preto)
     mic.arr[n0_] = 1;
 
 
     vector<int> nl = neighborsLabels(n0_); //nl pode ser vazio!
+    //cout << "numero de vizinhos " << nl.size() << endl;
 
     int newLabel;
 
     if (nl.empty()) {
+        //então o novo ponto preto forma um novo cluster isolado
         newLabel = getNextLabel();
+
     }
     else {
-        newLabel = *min_element(nl.begin(), nl.end());
+
+        newLabel = nl[0];
+
+        //cout << "entrei aqui " << endl;
+        //cout << "tamanho do PBclusters com label newLabel: " << pointsByCluster[newLabel].size() << endl;
+        //cout << "tamanho do PBclustersAUX com label newLabel: " << pointsByClusterAux[newLabel].size() << endl;
+
+
+        //pointsByClusterAux[newLabel].assign(rmax, 0); //é necessário zerar tudo?
         changedLabels.insert(newLabel);
-    }
 
-    //cross-check pair from now interconnected clusters
-    for (int ii = 0; ii < nl.size(); ii++) {
-        int la = nl[ii];
+        //cross-check pair from now interconnected clusters
 
-        for (int jj = 0; jj < ii; jj++) {
-            int lb = nl[jj];
-            int dist, a, b;
+        ////programa serial
+        //for (int ii = 0; ii < nl.size(); ii++) {
+        //    int la = nl[ii];
 
-            for (int j = 0; j < clustersAux[la].size(); j++) {
-                for (int k = 0; k < clustersAux[lb].size(); k++) {
-                    a = clustersAux[la][j];
-                    b = clustersAux[lb][k];
-                    dist = mic.dist(a, b);
-                    pointAux[dist] += 2;
-                    pointsByClusterAux[newLabel][dist] += 2;
+        //    for (int jj = 0; jj < ii; jj++) {
+        //        int lb = nl[jj];
+        //        int dist, a, b;
+
+        //        for (int j = 0; j < clustersAux[la].size(); j++) {
+        //            for (int k = 0; k < clustersAux[lb].size(); k++) {
+        //                a = clustersAux[la][j];
+        //                b = clustersAux[lb][k];
+        //                dist = mic.dist(a, b);
+        //                pointAux[dist] += 2;
+        //                pointsByClusterAux[newLabel][dist] += 2;
+        //            }
+        //        }
+        //    }
+        //}
+
+
+
+        //programa paralelo
+
+
+
+            for (int ii = 0; ii < nl.size(); ii++) {
+                int la = nl[ii];
+
+                for (int jj = 0; jj < ii; jj++) {
+                    int lb = nl[jj];
+
+#pragma omp parallel
+                    {
+                        vector<int> pointAuxP(rmax, 0);
+                        vector<int> pointsByClusterAuxP(rmax, 0);
+
+#pragma omp for nowait
+                    for (int n = 0; n < clustersAux[la].size()*clustersAux[lb].size(); n++) {
+
+                            int j = n / clustersAux[lb].size();
+                            int k = n % clustersAux[lb].size();
+
+                            int a = clustersAux[la][j];
+                            int b = clustersAux[lb][k];
+                            int dist = mic.dist(a, b);
+                            pointAuxP[dist] += 2;
+                            pointsByClusterAuxP[dist] += 2;
+                    }
+
+#pragma omp critical
+                    {
+                        for (int i = 0; i < rmax; i++) {
+                            pointAux[i] += pointAuxP[i];
+                            pointsByClusterAux[newLabel][i] += pointsByClusterAuxP[i];
+                        }
+                    }
+
                 }
             }
+
+
+        }
+
+        for (int i = 0; i < nl.size(); i++) {
+            int l = nl[i];
+            if (l != newLabel) {
+                //reassign labels of points of other clusters to main one
+                for (int j = 0; j < clustersAux[l].size(); j++) {
+                    labelsAux[clustersAux[l][j]] = newLabel;
+                }
+
+                //copy pairs of other clusters to main one
+                for (int k = 0; k < pointsByClusterAux[l].size(); k++) {
+                    pointsByClusterAux[newLabel][k] += pointsByClusterAux[l][k];
+                }
+
+                //update cluster table, appending old clusters to the new master one
+                clustersAux[newLabel].insert(clustersAux[newLabel].end(), clustersAux[l].begin(), clustersAux[l].end());
+
+                //clear old clusters
+                vacateClusterAux(l);
+            }
+        }
+
+        //add pairs with new black pixel
+        //parallelize
+        for (int i = 0; i < clustersAux[newLabel].size(); i++) { //note que nunca ocorre mic.dist(n0_, n0_)
+            int b = clustersAux[newLabel][i];
+            int dist = mic.dist(n0_, b);
+            pointAux[dist] += 2;
+            pointsByClusterAux[newLabel][dist] += 2;
+
         }
     }
 
-    for (int i = 0; i < nl.size(); i++) {
-        int l = nl[i];
-        if (l != newLabel) {
-            //reassign labels of points of other clusters to main one
-            for (int j = 0; j < clustersAux[l].size(); j++) {
-                labelsAux[clustersAux[l][j]] = newLabel;
-            }
+    
+    //cout << "newLabel " << newLabel << endl;
+    //cout << pointsByClusterAux[newLabel].size() << endl;
 
-            //copy pairs of other clusters to main one
-            for (int k = 0; k < pointsByClusterAux[l].size(); k++) {
-                pointsByClusterAux[newLabel][k] += pointsByClusterAux[l][k];
-            }
-
-            //update cluster table
-            clustersAux[newLabel].insert(clustersAux[newLabel].end(), clustersAux[l].begin(), clustersAux[l].end());
-
-            //clear old clusters
-            vacateClusterAux(l);
-        }
-    }
-
-    //add pairs with new black pixel
-    //parallelize
-    for (int i = 0; i < clustersAux[newLabel].size(); i++) { //note que nunca ocorre mic.dist(n0_, n0_)
-        int b = clustersAux[newLabel][i];
-        int dist = mic.dist(n0_, b);
-        pointAux[dist] += 2;
-        pointsByClusterAux[newLabel][dist] += 2;
-
-    }
 
     pointAux[0]++; //adicionando contribuição do novo ponto
     pointsByClusterAux[newLabel][0]++;
@@ -338,7 +424,8 @@ void ClusterGLP::update(int n0_, int n1_) {
     mic.arr[n1_] = 0; //muito importante para visitAux não revisitar n1_
     int lab = labelsAux[n1_]; //lab é a label que contém n1_ e todos os pontos do cluster em que n1_ estava
 
-    if (mic.freeEnergy8(n1_)==0) {
+
+    if (mic.freeEnergy8(n1_)==0 ) {
         //pixel inside cluster
 
         changedLabels.insert(lab);
@@ -359,6 +446,7 @@ void ClusterGLP::update(int n0_, int n1_) {
 
         labelsAux[n1_] = 0;
         pointAux[0]--;
+
         pointsByClusterAux[lab][0]--;
 
 
@@ -385,7 +473,7 @@ void ClusterGLP::update(int n0_, int n1_) {
         vacateClusterAux(lab);
 
 
-        vector<int> clusterLabelsToRecompute = {};
+        vector<int> clusterLabelsToRecompute;
 
         //visit neighbors again using DFS (possibly increasing the number of connected components)
         for (int i = 0; i < neighbors.size(); i++) {
@@ -393,6 +481,8 @@ void ClusterGLP::update(int n0_, int n1_) {
             if (labelsAux[b] == 0) {
                 int l = getNextLabel();
                 clusterLabelsToRecompute.push_back(l);
+                changedLabels.insert(l);
+
                 visitAux(b, l);
             }
         }
@@ -412,28 +502,55 @@ void ClusterGLP::update(int n0_, int n1_) {
 
             }
 
-            pointsByClusterAux[lab][0]--;
+            pointsByClusterAux[lab][0]--; 
             pointAux[0]--;
 
         }
         else {
 
+
+
             for (int ii = 0; ii < clusterLabelsToRecompute.size(); ii++) {
                 int l = clusterLabelsToRecompute[ii];
 
-                for (int i = 0; i < clustersAux[l].size(); i++) {
-                    int a = clustersAux[l][i];
-                    for (int j = 0; j < i; j++) {
-                        int b = clustersAux[l][j];
-                        int dist = mic.dist(a, b);
-                        pointAux[dist] += 2;
-                        pointsByClusterAux[l][dist] += 2;
-                    }
-                }
                 pointAux[0] += clustersAux[l].size();
                 pointsByClusterAux[l][0] += clustersAux[l].size();
 
+#pragma omp parallel
+                {
+
+                    vector<int> pointAuxP(rmax, 0);
+                    vector<int> pointsByClusterAuxP(rmax, 0);
+
+#pragma omp for nowait
+                    for (int k = 0; k < clustersAux[l].size()*(clustersAux[l].size()-1)/2; k++) {
+
+
+                            int i = k / clustersAux[l].size();
+                            int j = k % clustersAux[l].size();
+                            if (j <= i) i = clustersAux[l].size() - i - 2, j = clustersAux[l].size() - j - 1;
+
+                            int a = clustersAux[l][i];
+                            int b = clustersAux[l][j];
+                            int dist = mic.dist(a, b);
+                            pointAuxP[dist] += 2;
+                            pointsByClusterAuxP[dist] += 2;
+                        }
+
+
+#pragma omp critical
+                    {
+                        for (int i = 0; i < rmax; i++) {
+                            pointAux[i] += pointAuxP[i];
+                            pointsByClusterAux[l][i] += pointsByClusterAuxP[i];
+                        }
+                    }
+
+                }
+
+
             }
+
         }
     }
 
@@ -452,6 +569,12 @@ double ClusterGLP::getCurrEnergy() {
 
 void ClusterGLP::restoreAux() {
 
+    //pointAux = pointCurr;
+    //labelsAux = labels;
+    //deletedClusterLabelsAux = deletedClusterLabels;
+    //pointsByClusterAux = pointsByCluster;
+    //clustersAux = clusters;
+
     if (firstIteration) {
 
         pointAux = pointCurr;
@@ -462,14 +585,12 @@ void ClusterGLP::restoreAux() {
 
         firstIteration = false;
     }
+
     else {
 
         pointAux = pointCurr;
         labelsAux = labels;
         deletedClusterLabelsAux = deletedClusterLabels;
-
-        /*cout << "clustersAux/clusters size " << clustersAux.size() << "  " << clusters.size() << endl;
-        cout << "PBclustersAux/PBclusters size " << pointsByClusterAux.size() << "  " << pointsByCluster.size() << endl;*/
 
         int s = clusters.size();
         clustersAux.resize(s);
@@ -483,6 +604,8 @@ void ClusterGLP::restoreAux() {
             }
         }
     }
+
+    changedLabels.clear();
 
 }
 
@@ -514,3 +637,4 @@ void ClusterGLP::writeLabelsToFile(string path_) {
 
     file.close();
 }
+

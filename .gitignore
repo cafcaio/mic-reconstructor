@@ -40,6 +40,7 @@ mics
 *.jpg
 *.tif
 *.jfif
+*.vtk
 
 # Visual Studio Project Files
 Release
@@ -47,6 +48,9 @@ Debug
 .vs
 *.vcxproj*
 *.diagsession
+
+# Local and particular folders
+old
 
 
 

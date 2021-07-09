@@ -16,21 +16,20 @@ public:
     set<int> changedLabels; //set (i.e. non-repeating) labels for faster restore of current arrays
     Microstructure& mic; //microstructure to be operated
     int rmax; //maximum cluster size to be evaluated
-    int numAxis; //number of axis considered
     double currEnergy; //current quadratic error ("energy")
     double auxEnergy; //auxiliary quadratic error ("energy")
-    bool isReference = false; //marks correlation function as reference (won't be updated and such)
-    bool firstIteration = true; //marks if it is first iteration (for vector copying purposes)
+    bool isReference; //marks correlation function as reference (won't be updated and such)
+    bool firstIteration; //marks if it is first iteration (for vector copying purposes)
 
 
     //Constructors ------------------------------------------------------------------------------
 
     //Reference constructor
-    ClusterGLP(Microstructure& mic_, int numAxis_);
+    ClusterGLP(Microstructure& mic_);
 
     //Working microstructure constructors
-    ClusterGLP(Microstructure& mic_, vector<double> target_, int numAxis_);
-    ClusterGLP(Microstructure& mic_, string targetPath, int numAxis_);
+    ClusterGLP(Microstructure& mic_, vector<double> target_);
+    ClusterGLP(Microstructure& mic_, string targetPath);
 
 
 
@@ -82,6 +81,11 @@ public:
 
     //Write cluster labels to file in "path"
     void writeLabelsToFile(string path_);
+
+    //Fill target vector with zeros when target is too small for that size of microestructure
+    void fillTarget();
+
+
 
 };
 

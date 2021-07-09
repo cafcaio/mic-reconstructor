@@ -5,24 +5,23 @@
 
 using namespace std;
 
-
-class TwoPointGLP : public CorrFunction {
+class TwoPointOrtho : public CorrFunction {
 
 public:
-    vector<double> pointCurr;
-    vector<double> pointAux;
+    vector<int> aux;
+    vector<int> curr;
     vector<double> target;
 
     Microstructure& mic;
-    int rmax;
+    int rmax, numAxis;
     double currEnergy, auxEnergy;
     bool isReference;
 
 
     //Construtores
-    TwoPointGLP(Microstructure& mic_);
-    TwoPointGLP(Microstructure& mic_, vector<double> target_);
-    TwoPointGLP(Microstructure& mic_, string targetPath);
+    TwoPointOrtho(Microstructure& mic_, int numAxis_);
+    TwoPointOrtho(Microstructure& mic_, vector<double> target_, int numAxis_);
+    TwoPointOrtho(Microstructure& mic_, string targetPath, int numAxis_);
 
     //Cálculos iniciais
     void firstCalc();
@@ -32,12 +31,18 @@ public:
     double getAuxEnergy() override;
     double energyDiff() override;
     void update(int n0_, int n1_) override;
-    double getCurrEnergy() override;
     void swap() override;
+    double getCurrEnergy() override;
 
-    //Leitura e escrita de arquivo
+
+
+    //Leitura e escrita noi arquivo
     void readFile(string path);
     void writeToFile(string path_);
+    
+    //calcula e escreve S2 considerando estrutura não-periódica
+    void writeToFileNonPeriodic(string path_); 
+    vector<double> evalNonPeriodic();
 
 };
 

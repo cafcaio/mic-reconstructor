@@ -1,9 +1,8 @@
 #include "TwoPointGLP.h"
 
-TwoPointGLP::TwoPointGLP(Microstructure& mic_, int numAxis_) : mic(mic_) { //assume como referência
+TwoPointGLP::TwoPointGLP(Microstructure& mic_) : mic(mic_) { //assume como referência
     isReference = true;
 
-    numAxis = numAxis_;
 
     rmax = mic.max_diagonal_distance();
 
@@ -20,14 +19,20 @@ TwoPointGLP::TwoPointGLP(Microstructure& mic_, int numAxis_) : mic(mic_) { //ass
 
 }
 
-TwoPointGLP::TwoPointGLP(Microstructure& mic_, vector<double> target_, int numAxis_) : mic(mic_) { //lê do vetor
-    numAxis = numAxis_;
+TwoPointGLP::TwoPointGLP(Microstructure& mic_, vector<double> target_) : mic(mic_) { //lê do vetor
+    isReference = false;
 
 
+    //rmax = target_.size();
     rmax = mic.max_diagonal_distance();
 
     firstCalc();
     target = target_;
+
+    while (target.size() < mic.max_diagonal_distance()) {
+        target.push_back(0);
+    }
+
     currEnergy = getStartEnergy();
 
 }
@@ -36,13 +41,18 @@ TwoPointGLP::TwoPointGLP(Microstructure& mic_, vector<double> target_, int numAx
 
 
 
-TwoPointGLP::TwoPointGLP(Microstructure& mic_, string targetPath, int numAxis_) : mic(mic_) {
-    numAxis = numAxis_;
+TwoPointGLP::TwoPointGLP(Microstructure& mic_, string targetPath) : mic(mic_) {
+    isReference = false;
 
     rmax = mic.max_diagonal_distance();
 
     firstCalc();
     readFile(targetPath);
+
+    while (target.size() < mic.max_diagonal_distance()) {
+        target.push_back(0);
+    }
+
     currEnergy = getStartEnergy();
 
 }
@@ -87,7 +97,7 @@ void TwoPointGLP::firstCalc() {
 
 double TwoPointGLP::getStartEnergy() {
     double sum = 0;
-    double val;
+    double val = 0;
     for (int r = 0; r < rmax; r++) {
         val = (target[r] - pointCurr[r] / mic.lattice[r]);
         sum += val * val;
@@ -97,10 +107,16 @@ double TwoPointGLP::getStartEnergy() {
 
 double TwoPointGLP::getAuxEnergy() {
     double sum = 0;
-    double val;
+    double val = 0;
     for (int r = 0; r < rmax; r++) {
         val = (target[r] - pointAux[r] / mic.lattice[r]);
         sum += val * val;
+    }
+    if (sum > 10000) {
+        cout << "\nr, sum, target, pointAux/mic.lattice" << endl;
+        for (int r = 0; r < rmax; r++) {
+            cout << r << "  " << sum << "  " << target[r] << "  " << pointAux[r] / mic.lattice[r] << endl;
+        }
     }
     return sum;
 }
@@ -160,7 +176,7 @@ void TwoPointGLP::update(int n0_, int n1_) {
         int dist;
 
 
-#pragma omp for
+#pragma omp for nowait
         for (int i = 0; i < mic.n2; i++) {
             //cout << "i = " << i << " done by thread " << omp_get_thread_num() << endl;
 

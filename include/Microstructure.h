@@ -1,6 +1,5 @@
 #pragma once
 
-#include <opencv2/opencv.hpp>
 #include <omp.h>
 #include <string>
 #include <vector>
@@ -9,9 +8,10 @@
 #include <set>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 using namespace std;
-using namespace cv;
+
 
 class Microstructure {
 
@@ -21,7 +21,7 @@ public:
     int n; //total number of pixels
     int n1; //number of white pixels
     int n2;  //number of black pixels
-    double f = 0; //volume fraction of black pixels
+    double f; //volume fraction of black pixels
     vector<int> arr; //array of phases
     vector<int> phase0; //indices of all white pixels
     vector<int> phase1; //indexes of all black pixels
@@ -29,29 +29,30 @@ public:
 
     vector<double> lattice; //lattice sites separation histogram
     vector<int> sqrtTable; //cached square root table (for distance computation)
-    bool allocatedLattice = false;
-    bool allocatedSqrtTable = false;
+    bool allocatedLattice;
+    bool allocatedSqrtTable;
 
     //vagant points coords and indexes
     //removal intended
 
-    int np0 = 0;
-    int np1 = 0;
-    int xp0 = 0;
-    int xp1 = 0;
-    int yp0 = 0;
-    int yp1 = 0;
-    int zp0 = 0;
-    int zp1 = 0;
+    int np0, np1;
+    int xp0, xp1;
+    int yp0, yp1;
+    int zp0, zp1;
+
+    //initialize int and bool variables
+    void initialize();
 
 
     //Constructors ------------------------------------------------------------------------------
     
-    //Create matrix based on OpenCV mat object (reference microstructure)
-    Microstructure(Mat& image);
-
-    //Creates a random matrix with specified dimensions and volume fraction
+    //Create matrix based on ParaView file (reference microstructure)
+    Microstructure(string path_);
+    
+    //Creates a ***random*** matrix with specified dimensions and volume fraction
     Microstructure(int nx_, int ny_, int nz_, double f_);
+
+
 
 
 

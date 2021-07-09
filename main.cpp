@@ -5,10 +5,11 @@
 #include "Reconstructor.h"
 #include "ClusterGLP.h"
 #include "TwoPointGLP.h"
+#include <ctime>
+#include <map>
 
-using namespace cv;
 using namespace std;
-
+using namespace std::chrono;
 
 //TO DO:
 
@@ -24,99 +25,143 @@ using namespace std;
 //Testar num computador melhor!
 
 
+
+// default = "YYYYMMDD-HHMMSS"
+inline std::string time_stamp(const std::string& fmt = "%Y%m%d-%H%M%S")
+{
+    time_t timer = time(0);
+    tm bt;
+    localtime_s(&bt, &timer);
+    char buf[64];
+    std::strftime(buf, sizeof(buf), fmt.c_str(), &bt);
+    string ans(buf);
+    return ans;
+}
+
+//template <class T>
+//class ReversibleVector {
+//    vector<T> valuesOld;
+//    vector<T> valuesNew;
+//    set<int> changedItems;
+//
+//    ReversibleVector(vector<T> v) {
+//        valuesOld = v;
+//        valuesNew = v;
+//    }
+//
+//    void set_value(int label, T new_value) {
+//        valuesNew[label] = new_value;
+//        changedItems.insert(label);
+//    }
+//
+//    T get_value_old(int label) {
+//        return valuesOld[label];
+//    }
+//
+//    T get_value_new(int label) {
+//        return valuesNew[label];
+//    }
+//
+//
+//
+//
+//
+//};
+
+
+
 int main()
 {
-    omp_set_num_threads(omp_get_max_threads());
 
+    auto start = high_resolution_clock::now();
+
+    int numThreads = omp_get_max_threads();
+    omp_set_num_threads(numThreads);
+
+    //entrada da microestrutura de referência
+    Microstructure ref("testefofonodserver130.vtk");
+    ref.printToFileParaview("outputs\\referencia.vtk");
+
+    //reference two point function
+    TwoPointGLP s2_ref(ref);
+    ClusterGLP c2_ref(ref);
+
+    s2_ref.writeToFile("outputs\\s2ref.dat");
+    c2_ref.writeToFile("outputs\\c2ref.dat");
+
+    
     //matrix dimensions
-    int nx = 100;
-    int ny = 100;
-    int nz = 1;
+    int nx = 50;
+    int ny = 50;
+    int nz = 50;
 
     //termination criteria
     double error = 1e-7;
-    int maxIterations = 2e06;
+    int maxIterations = 0.5e06;
 
     //reconstruction parameters
     int initialIterations = 3000;
     int coolingIterations = 3000;
-    double coolingRate = 0.92;
-    double initialProb = 0.4;
+    double coolingRate = 0.90;
+    double initialProb = 0.2;
     double surfOptPerc = 0.5;
+
+    string timeDate = time_stamp();
+
+    string recLabel = "fofonodserver";
+    string recName = timeDate + "-" + recLabel + "-";
+
+ 
+
+    
 
     //Useful values:
     //(200x200, 2kk iterations): 3000,3000,0.92,0.4,0.5 (fofonod.jpg)
 
     
-    //reference image
-    Mat image = imread("imgs\\cement.png", IMREAD_GRAYSCALE);
-    Mat cropped = image(Rect(0,0, 300, 300)).clone();
-
-    threshold(cropped, cropped, 128, 255, THRESH_BINARY_INV);
-
-    resize(cropped, cropped, Size(nx, ny), 0, 0, INTER_AREA);
-
-    imshow("Original", image);
-    imshow("Cropped", cropped);
-    waitKey();
-    destroyAllWindows();
-
-
-
-    double start, end;
-
-    Microstructure ref(cropped);
-    ref.printToFileTecplot("outputs\\referencia.dat");
-    //ref.printToFileParaview("outputs\\refparaview.vtk");
-
-
-    //reference two point function
-    TwoPointGLP s2ref(ref, 2);
-    s2ref.writeToFile("outputs\\s2ref.dat");
-
-
-    //reference two point cluster function
-    ClusterGLP c2ref(ref, 2);
-    c2ref.writeToFile("outputs\\c2ref.dat");
-
     //to be reconstructed microstructure and correlation functions
-    Microstructure michibrido(nx, ny, 1, ref.f);
-
-    TwoPointGLP s2rechibrido(michibrido, s2ref.target, 2);
-    ClusterGLP c2rechibrido(michibrido, c2ref.target, 2);
+    Microstructure mic(nx, ny, nz, ref.f);
+    
+    TwoPointGLP s2(mic, s2_ref.target);
+    ClusterGLP c2(mic, c2_ref.target);
 
     //use operator& for each correlation function
-    vector<CorrFunction*> funcs = { &s2rechibrido, &c2rechibrido };
+    vector<CorrFunction*> funcs;
+    funcs.push_back(&s2);
+    funcs.push_back(&c2);
 
     //setting Reconstructor object and parameters
-    Reconstructor rechibrido(michibrido, funcs, error, maxIterations);
-    rechibrido.setCoolingSchedule(initialIterations, coolingIterations, coolingRate, initialProb);
-    rechibrido.setWeights({ 1,1 });
-    rechibrido.setConsolePrintFreq(10000);
-    rechibrido.setLogFreq(10000, "outputs\\RecStats.dat");
-    rechibrido.setMicWriteFreq(10000, "mics\\cement");
-    rechibrido.setSurfaceOptStart(surfOptPerc);
+    Reconstructor rec(mic, funcs, error, maxIterations);
+    rec.setCoolingSchedule(initialIterations, coolingIterations, coolingRate, initialProb);
+    vector<double> w;
+    w.push_back(1.0); //peso da funcao 1
+    w.push_back(1.0); //peso da funcao 2
+
+    rec.setWeights(w);
+    rec.setConsolePrintFreq(10000);
+    rec.setLogFreq(10000, "outputs\\RecStats.dat");
+
+    string recLabel1 = "mics\\saida" + timeDate;
+    rec.setMicWriteFreq(10000, recLabel1);
+    rec.setSurfaceOptStart(surfOptPerc);
 
 
-    start = clock();
-    rechibrido.reconstruct();
-    end = clock();
+    rec.reconstruct();
+
 
     //write reconstructed microstructure and final correlation functions
-    michibrido.printToFileTecplot("outputs\\reconstruidohibridos2c2.dat");
-    s2rechibrido.writeToFile("outputs\\s2rechibrido.dat");
-    c2rechibrido.writeToFile("outputs\\c2rechibrido.dat");
+    mic.printToFileParaview("outputs\\reconstructed.vtk");
+    s2.writeToFile("outputs\\s2final.dat");
+    c2.writeToFile("outputs\\c2final.dat");
 
 
-    cout << "Tempo total: " << (end - start) / CLOCKS_PER_SEC << " s" << "\n";
+    auto stop = high_resolution_clock::now();
+    double duration = duration_cast<milliseconds>(stop - start).count() / 1000.0;
+    cout << "Tempo total: " << duration << " s" << "\n";
 
+    ClusterGLP debugc2(mic);
+    debugc2.writeToFile("outputs\\debugc2.dat");
 
-    //to check if correlation function updates are working as expected
-    TwoPointGLP s2final(michibrido, 2);
-    s2final.writeToFile("outputs\\s2final.dat");
-
-    ClusterGLP c2final(michibrido, 2);
-    c2final.writeToFile("outputs\\c2final.dat");
 
     return 0;
 }

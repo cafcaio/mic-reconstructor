@@ -7,16 +7,16 @@ struct Reconstructor::LogData {
     vector<int> negEnergySwapsLog;
     vector<int> posEnergySwapsLog;
     vector<double> temperatureLog;
-    int size = 0;
+    int size;
 
     void reserve(int s) {
+        size = s;
         totalEnergyLog.reserve(s);
         timeLog.reserve(s);
         numIterationsLog.reserve(s);
         negEnergySwapsLog.reserve(s);
         posEnergySwapsLog.reserve(s);
         temperatureLog.reserve(s);
-        size = s;
     }
 };
 
@@ -70,6 +70,24 @@ void Reconstructor::setMicWriteFreq(int freq_, string fileLabel_ ) {
 
 Reconstructor::Reconstructor(Microstructure& mic_, vector<CorrFunction*>& funcs_, double tol_, int tmax_) : mic(mic_), funcs(funcs_) {
 
+    //initialize default variables
+    micWriteLabel = "mics\\mic"; //default file name for intermediate microstructure file write
+    logPath = "RecStats.dat"; //default file name of reconstruction parameters log write
+
+    //Cooling schedule parameters
+    initial = 2000; //initial iterations that counts toward first temperature computation
+    chainSize = 2000; //number of iterations between each cooling step
+    factor = 0.92; //factor by which temperature is multiplied in each cooling step
+    prob = 0.5; //probability of acceptance of positive energy difference swap at start of reconstruction
+    surfaceOptStart = 0.5; //starting point (in % of total iterations) of surface optimization
+
+    //Logging frequencies
+    consolePrintFreq = 10000; //frequency to write on console
+    logFreq = 10000; //frequency to write reconstruction statistics
+    micWriteFreq = 10000; //frequency to write intermediate microstructure between start and finish of reconstruction
+
+
+    t = 0;
     tmax = tmax_;
     tol = tol_;
     nfuns = funcs.size();
@@ -86,6 +104,12 @@ void Reconstructor::reconstruct() {
     random_device rd;
     mt19937 gen(rd());
     uniform_real_distribution<double> dist(0.0, 1.0);
+
+    auto start = high_resolution_clock::now();
+    double duration, d_0, d_1, d_2;
+
+    duration = duration_cast<milliseconds>(high_resolution_clock::now() - start).count() / 1000;
+    d_0 = duration, d_1 = duration, d_2 = duration;
 
     double timeElapsed = clock();
 
@@ -108,7 +132,7 @@ void Reconstructor::reconstruct() {
     int micWriteCounter = 0;
 
 
-    while (t<tmax and totalEnergy()>tol) {
+    while (t<tmax && totalEnergy()>tol) {
 
 
         if (t < tmax * surfaceOptStart) { //faz trocas totalmente aleatórias
@@ -167,18 +191,36 @@ void Reconstructor::reconstruct() {
 
         //outputs and logs
 
+
+
         if (t % consolePrintFreq == 0) {
-            cout << "======= Resumo, t = " << t << " ==============\n";
+
+            duration = duration_cast<milliseconds>(high_resolution_clock::now() - start).count()/1000.0;
+
+            d_2 = d_1;
+            d_1 = d_0;
+            d_0 = duration;
+
+
+            double derivative = (-d_1 + d_0) / consolePrintFreq; //error O(h)
+            //double derivative = (1.0 / 2 * d_2 - 2.0 * d_1 + 3.0 / 2 * d_0) / consolePrintFreq; //error O(h^2)
+            double eta = derivative * (tmax - t);
+
+            cout << "======= Resumo, t = " << t << " (" << (int)(t*100/tmax)<< "%)" <<" ==============\n";
             cout << "Energia total = " << totalEnergy() << "\n";
+            cout << "E1 = " << funcs[0]->getCurrEnergy() << " E2 = " << funcs[1]->getCurrEnergy() << endl;
             cout << "Num de trocas desfavoraveis = " << trocasPos << "\n";
             cout << "Num de trocas favoraveis = " << trocasZero << " (dif: " << trocasZero - trocasPos << ")" << "\n";
             cout << "Temperatura = " << temp << "\n";
-            cout << "Tempo decorrido = " << (clock() - timeElapsed) / CLOCKS_PER_SEC << " s\n\n";
+            cout << "Tempo decorrido = " << duration << " s\n";
+            cout << "Tempo estimado = " << eta << " s\n\n";
         }
 
         if (logFreq!=0 && t % logFreq == 0) {
+            duration = duration_cast<milliseconds>(high_resolution_clock::now() - start).count() / 1000.0;
+
             logFile.totalEnergyLog.push_back(totalEnergy());
-            logFile.timeLog.push_back((clock() - timeElapsed) / CLOCKS_PER_SEC);
+            logFile.timeLog.push_back(duration);
             logFile.negEnergySwapsLog.push_back(trocasZero);
             logFile.posEnergySwapsLog.push_back(trocasPos);
             logFile.temperatureLog.push_back(temp);
@@ -197,12 +239,13 @@ void Reconstructor::reconstruct() {
 
 
     //finishing outputs and logs
+    duration = duration_cast<milliseconds>(high_resolution_clock::now() - start).count() / 1000.0;
     cout << "======= Programa finalizado, t = " << t << " ==============\n";
     cout << "Energia total = " << totalEnergy() << "\n";
     cout << "Num de trocas desfavoraveis = " << trocasPos << "\n";
     cout << "Num de trocas favoraveis = " << trocasZero << "\n";
     cout << "Temperatura = " << temp << "\n";
-    cout << "Tempo total = " << (clock() - timeElapsed) / CLOCKS_PER_SEC << " s\n\n";
+    cout << "Tempo total = " << duration << " s\n\n";
     if (t == tmax) {
         cout << "Encerrado pelo critério de tempo máximo" << "\n";
     }
@@ -211,8 +254,10 @@ void Reconstructor::reconstruct() {
     }
 
     if (logFreq != 0) {
+        duration = duration_cast<milliseconds>(high_resolution_clock::now() - start).count() / 1000.0;
+
         logFile.totalEnergyLog.push_back(totalEnergy());
-        logFile.timeLog.push_back((clock() - timeElapsed) / CLOCKS_PER_SEC);
+        logFile.timeLog.push_back(duration);
         logFile.negEnergySwapsLog.push_back(trocasZero);
         logFile.posEnergySwapsLog.push_back(trocasPos);
         logFile.temperatureLog.push_back(temp);

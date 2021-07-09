@@ -1,14 +1,49 @@
 #include "Microstructure.h"
 
 using namespace std;
-using namespace cv;
+
+void Microstructure::initialize() {
+    nx = 0;
+    ny = 0,
+    nz = 0; 
+    n = 0; //total number of pixels
+    n1 = 0; //number of white pixels
+    n2 = 0;  //number of black pixels
+    f = 0; //volume fraction of black pixels
+
+    allocatedLattice = false;
+    allocatedSqrtTable = false;
+
+    np0 = 0;
+    np1 = 0;
+    xp0 = 0;
+    xp1 = 0;
+    yp0 = 0;
+    yp1 = 0;
+    zp0 = 0;
+    zp1 = 0;
+}
 
 
-Microstructure::Microstructure(Mat& image) { //lê da imagem diretamente
 
-    nx = image.cols;
-    ny = image.rows;
-    nz = 1;
+Microstructure::Microstructure(string path_) {
+
+    initialize();
+
+    ifstream file(path_);
+    string value;
+    string line;
+
+    for (int i = 0; i < 4; i++) getline(file, line);
+
+    file >> value >> value;
+    nx = stoi(value);
+    file >> value;
+    ny = stoi(value);
+    file >> value;
+    nz = stoi(value);
+
+    for (int i = 0; i < 7; i++) getline(file, line);
 
     n = nx * ny * nz;
 
@@ -16,8 +51,6 @@ Microstructure::Microstructure(Mat& image) { //lê da imagem diretamente
     xx.assign(n, 0);
     yy.assign(n, 0);
     zz.assign(n, 0);
-    phase0.assign(n, 0);
-    phase1.assign(n, 0);
 
     int ind = 0;
     for (int k = 0; k < nz; k++) {
@@ -31,36 +64,39 @@ Microstructure::Microstructure(Mat& image) { //lê da imagem diretamente
         }
     }
 
+    phase0.reserve(n);
+    phase1.reserve(n);
+
     n1 = 0;
     n2 = 0;
-    int counter0 = 0;
-    int counter1 = 0;
-
-    //binariza e insere no arr
-    for (int i = 0; i < nx; i++) {
-        for (int j = 0; j < ny; j++) {
-            if (image.at<uint8_t>(j, i) < 127) { //0 = preto, 255=branco
-                arr[j * nx + i] = 1;
-                n2 = n2 + 1;
-                phase1[counter1] = j * nx + i;
-                counter1 += 1;
-            }
-            else {
-                n1 = n1 + 1;
-                phase0[counter0] = j * nx + i;
-                counter0 += 1;
-            }
+    for (int i = 0; i < n; i++) {
+        file >> value;
+        arr[i] = stoi(value);
+        if (arr[i] == 0) {
+            phase0.push_back(i);
+            n1++;
         }
+        else {
+            phase1.push_back(i);
+            n2++;
+        }
+        getline(file, line);
     }
-
-    f = double(n2) / n;
 
     phase0.resize(n1);
     phase1.resize(n2);
+
+    f = (double)n2 / n;
+
+    file.close();
 }
 
 
 Microstructure::Microstructure(int nx_, int ny_, int nz_, double f_) { //cria array vazio p/ reconstrucao
+
+    initialize();
+
+
     nx = nx_;
     ny = ny_;
     nz = nz_;
@@ -168,6 +204,7 @@ void Microstructure::allocateLattice() {
 
     }
 
+
     allocatedLattice = true;
 
 
@@ -176,7 +213,7 @@ void Microstructure::allocateLattice() {
 
 //retorna índices dos 4-vizinhos OCUPADOS do ponto n
 vector<int> Microstructure::neighborsIndexes(int n) {
-    vector<int> ans = {};
+    vector<int> ans;
     ans.reserve(6);
 
     int ind;
@@ -207,7 +244,7 @@ vector<int> Microstructure::neighborsIndexes(int n) {
 
 //retorna índices dos 8-vizinhos OCUPADOS do ponto n
 vector<int> Microstructure::neighborsIndexes8(int n) {
-    vector<int> ans = {};
+    vector<int> ans;
 
     int ind;
     for (int i = 0; i < 3; i++) {

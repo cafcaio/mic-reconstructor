@@ -2,8 +2,10 @@
 
 #include "CorrFunction.h"
 #include "Microstructure.h"
+#include <chrono>
 
 using namespace std;
+using namespace std::chrono;
 
 class Reconstructor {
 public:
@@ -11,26 +13,26 @@ public:
     struct LogData; //struct for keeping log data for posterior file writing
     double tol; //energy tolerance
     int tmax; //maximum number of iterations
-    int t = 0; //current iteration (or "time")
-    int nfuns = 0; //number of correlation functions
+    int t; //current iteration (or "time")
+    int nfuns; //number of correlation functions
     vector<CorrFunction*> funcs; //vector with references of correlation functions
     vector<double> weights; //weights to be applied to each correlation function (normalized in firstCalc() method)
     Microstructure& mic; //microstructure to be operated during reconstruction
     
-    string micWriteLabel = "mics\\mic"; //default file name for intermediate microstructure file write
-    string logPath = "RecStats.dat"; //default file name of reconstruction parameters log write
+    string micWriteLabel; //default file name for intermediate microstructure file write
+    string logPath; //default file name of reconstruction parameters log write
 
     //Cooling schedule parameters
-    int initial = 2000; //initial iterations that counts toward first temperature computation
-    int chainSize = 2000; //number of iterations between each cooling step
-    double factor = 0.92; //factor by which temperature is multiplied in each cooling step
-    double prob = 0.5; //probability of acceptance of positive energy difference swap at start of reconstruction
-    double surfaceOptStart = 0.5; //starting point (in % of total iterations) of surface optimization
+    int initial; //initial iterations that counts toward first temperature computation
+    int chainSize; //number of iterations between each cooling step
+    double factor; //factor by which temperature is multiplied in each cooling step
+    double prob; //probability of acceptance of positive energy difference swap at start of reconstruction
+    double surfaceOptStart; //starting point (in % of total iterations) of surface optimization
 
     //Logging frequencies
-    int consolePrintFreq = 10000; //frequency to write on console
-    int logFreq = 10000; //frequency to write reconstruction statistics
-    int micWriteFreq = 10000; //frequency to write intermediate microstructure between start and finish of reconstruction
+    int consolePrintFreq; //frequency to write on console
+    int logFreq; //frequency to write reconstruction statistics
+    int micWriteFreq; //frequency to write intermediate microstructure between start and finish of reconstruction
 
 
     //Constructor of Reconstructor object ----------------------------------------------------------
